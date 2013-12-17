@@ -457,8 +457,8 @@ endif()
 
 # Installation Paths
 if(WIN32)
-	set(CMAKE_INSTALL_BINDIR ".")
-	set(CMAKE_INSTALL_LIBDIR ".")
+	set(CMAKE_INSTALL_BINDIR ${CMAKE_INSTALL_PREFIX})
+	set(CMAKE_INSTALL_LIBDIR ${CMAKE_INSTALL_PREFIX})
 endif()
 
 # Path to put FreeRDP data
