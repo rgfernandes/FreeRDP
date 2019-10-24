@@ -734,11 +734,31 @@ static int xcrush_generate_output(XCRUSH_CONTEXT* xcrush, BYTE* OutputBuffer, UI
 
 static size_t xcrush_copy_bytes(BYTE* dst, const BYTE* src, size_t num)
 {
-	size_t index;
-
-	for (index = 0; index < num; index++)
+	if (src + num < dst || dst + num < src)
 	{
-		dst[index] = src[index];
+		memcpy(dst, src, num);
+	}
+	else
+	{
+		size_t index = 0;
+		// copy 4 or 8 bytes at once
+#if __LP64__
+		size_t end = num / 8;
+		for (; index < end; index += 8)
+		{
+			*((UINT64*)(dst + index)) = *((UINT64*)(src + index));
+		}
+#else
+		size_t end = num / 4;
+		for (; index < end; index += 4)
+		{
+			*((UINT32*)(dst + index)) = *((UINT32*)(src + index));
+		}
+#endif
+		for (; index < num; index++)
+		{
+			dst[index] = src[index];
+		}
 	}
 
 	return num;
@@ -821,7 +841,7 @@ static int xcrush_decompress_l1(XCRUSH_CONTEXT* xcrush, const BYTE* pSrcData, UI
 				    (&Literals[OutputLength] > pSrcEnd))
 					return -1009;
 
-				xcrush_copy_bytes(HistoryPtr, Literals, OutputLength);
+				memcpy(HistoryPtr, Literals, OutputLength);
 				HistoryPtr += OutputLength;
 				Literals += OutputLength;
 				OutputOffset += OutputLength;
@@ -849,7 +869,7 @@ static int xcrush_decompress_l1(XCRUSH_CONTEXT* xcrush, const BYTE* pSrcData, UI
 		if ((&HistoryPtr[OutputLength] >= HistoryBufferEnd) || (&Literals[OutputLength] > pSrcEnd))
 			return -1012;
 
-		xcrush_copy_bytes(HistoryPtr, Literals, OutputLength);
+		memcpy(HistoryPtr, Literals, OutputLength);
 		HistoryPtr += OutputLength;
 	}
 
