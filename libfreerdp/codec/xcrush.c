@@ -732,7 +732,7 @@ static int xcrush_generate_output(XCRUSH_CONTEXT* xcrush, BYTE* OutputBuffer, UI
 	return 1;
 }
 
-static size_t xcrush_copy_bytes(BYTE* dst, const BYTE* src, size_t num)
+static size_t xcrush_copy_bytes_opt(BYTE* dst, const BYTE* src, size_t num)
 {
 	if (src + num < dst || dst + num < src)
 	{
@@ -759,6 +759,30 @@ static size_t xcrush_copy_bytes(BYTE* dst, const BYTE* src, size_t num)
 		{
 			dst[index] = src[index];
 		}
+	}
+
+	return num;
+}
+
+static size_t xcrush_copy_bytes_orig(BYTE* dst, const BYTE* src, size_t num)
+{
+	size_t index;
+
+	for (index = 0; index < num; index++)
+	{
+		dst[index] = src[index];
+	}
+
+	return num;
+}
+
+static size_t xcrush_copy_bytes(BYTE* dst, const BYTE* src, size_t num)
+{
+	size_t index;
+
+	for (index = 0; index < num; index++)
+	{
+		dst[index] = src[index];
 	}
 
 	return num;
@@ -841,6 +865,7 @@ static int xcrush_decompress_l1(XCRUSH_CONTEXT* xcrush, const BYTE* pSrcData, UI
 				    (&Literals[OutputLength] > pSrcEnd))
 					return -1009;
 
+				xcrush_copy_bytes(HistoryPtr, Literals, OutputLength);
 				memcpy(HistoryPtr, Literals, OutputLength);
 				HistoryPtr += OutputLength;
 				Literals += OutputLength;
@@ -856,7 +881,8 @@ static int xcrush_decompress_l1(XCRUSH_CONTEXT* xcrush, const BYTE* pSrcData, UI
 			    (&OutputPtr[MatchLength] >= HistoryBufferEnd))
 				return -1011;
 
-			xcrush_copy_bytes(HistoryPtr, OutputPtr, MatchLength);
+			xcrush_copy_bytes_orig(HistoryPtr, OutputPtr, MatchLength);
+			xcrush_copy_bytes_opt(HistoryPtr, OutputPtr, MatchLength);
 			OutputOffset += MatchLength;
 			HistoryPtr += MatchLength;
 		}
@@ -869,6 +895,7 @@ static int xcrush_decompress_l1(XCRUSH_CONTEXT* xcrush, const BYTE* pSrcData, UI
 		if ((&HistoryPtr[OutputLength] >= HistoryBufferEnd) || (&Literals[OutputLength] > pSrcEnd))
 			return -1012;
 
+		xcrush_copy_bytes(HistoryPtr, Literals, OutputLength);
 		memcpy(HistoryPtr, Literals, OutputLength);
 		HistoryPtr += OutputLength;
 	}
