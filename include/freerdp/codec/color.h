@@ -715,7 +715,49 @@ extern "C"
 	 *
 	 * @return The pixel color in internal representation
 	 */
-	static INLINE UINT32 ReadColor(const BYTE* src, UINT32 format, UINT32 bitsPerPixel)
+	static INLINE UINT32 ReadColor_orig(const BYTE* src, UINT32 format)
+	{
+		UINT32 color;
+
+		switch (GetBitsPerPixel(format))
+		{
+			case 32:
+				color = ((UINT32)src[0] << 24) | ((UINT32)src[1] << 16) | ((UINT32)src[2] << 8) |
+				        src[3];
+				break;
+
+			case 24:
+				color = ((UINT32)src[0] << 16) | ((UINT32)src[1] << 8) | src[2];
+				break;
+
+			case 16:
+				color = ((UINT32)src[1] << 8) | src[0];
+				break;
+
+			case 15:
+				color = ((UINT32)src[1] << 8) | src[0];
+
+				if (!ColorHasAlpha(format))
+					color = color & 0x7FFF;
+
+				break;
+
+			case 8:
+			case 4:
+			case 1:
+				color = *src;
+				break;
+
+			default:
+				WLog_ERR(CTAG, "Unsupported format %s", FreeRDPGetColorFormatName(format));
+				color = 0;
+				break;
+		}
+
+		return color;
+	}
+
+	static INLINE UINT32 ReadColor_opt(const BYTE* src, UINT32 format, UINT32 bitsPerPixel)
 	{
 		UINT32 color;
 
@@ -757,6 +799,17 @@ extern "C"
 		return color;
 	}
 
+	static INLINE UINT32 ReadColor(const BYTE* src, UINT32 format, UINT32 bitsPerPixel)
+	{
+		UINT32 color_orig = ReadColor_orig(src, format);
+		UINT32 color_opt = ReadColor_opt(src, format, bitsPerPixel);
+		if (color_orig != color_opt) {
+			fprintf(stderr, "Wrong ReadColor\n");
+			exit(1);
+		}
+		return color_opt;
+	}
+
 	/***
 	 *
 	 * Write a pixel from internal representation to memory
@@ -767,7 +820,49 @@ extern "C"
 	 *
 	 * @return TRUE if successful, FALSE otherwise
 	 */
-	static INLINE BOOL WriteColor(BYTE* dst, UINT32 format, UINT32 bitsPerPixel, UINT32 color)
+	static INLINE BOOL WriteColor_orig(BYTE* dst, UINT32 format, UINT32 color)
+	{
+		switch (GetBitsPerPixel(format))
+		{
+			case 32:
+				dst[0] = (BYTE)(color >> 24);
+				dst[1] = (BYTE)(color >> 16);
+				dst[2] = (BYTE)(color >> 8);
+				dst[3] = (BYTE)color;
+				break;
+
+			case 24:
+				dst[0] = (BYTE)(color >> 16);
+				dst[1] = (BYTE)(color >> 8);
+				dst[2] = (BYTE)color;
+				break;
+
+			case 16:
+				dst[1] = (BYTE)(color >> 8);
+				dst[0] = (BYTE)color;
+				break;
+
+			case 15:
+				if (!ColorHasAlpha(format))
+					color = color & 0x7FFF;
+
+				dst[1] = (BYTE)(color >> 8);
+				dst[0] = (BYTE)color;
+				break;
+
+			case 8:
+				dst[0] = (BYTE)color;
+				break;
+
+			default:
+				WLog_ERR(CTAG, "Unsupported format %s", FreeRDPGetColorFormatName(format));
+				return FALSE;
+		}
+
+		return TRUE;
+	}
+
+	static INLINE BOOL WriteColor_opt(BYTE* dst, UINT32 format, UINT32 bitsPerPixel, UINT32 color)
 	{
 		switch (bitsPerPixel)
 		{
@@ -806,6 +901,23 @@ extern "C"
 				return FALSE;
 		}
 
+		return TRUE;
+	}
+
+	static INLINE BOOL WriteColor(BYTE* dst, UINT32 format, UINT32 bitsPerPixel, UINT32 color)
+	{
+		BYTE dst2[4];
+		WriteColor_orig(dst, format, color);
+		if (WriteColor_opt(dst2, format, bitsPerPixel, color) == FALSE)
+		{
+			return FALSE;
+		}
+		UINT32 bytes = bitsPerPixel == 15 ? 2 : bitsPerPixel / 8;
+		if (memcmp(dst2, dst, bytes) != 0 && bitsPerPixel != 15)
+		{
+			fprintf(stderr, "Wrong WriteColor %u %08X %08X\n", bitsPerPixel, *((UINT32*)dst), *((UINT32*)dst2));
+			exit(1);
+		}
 		return TRUE;
 	}
 
